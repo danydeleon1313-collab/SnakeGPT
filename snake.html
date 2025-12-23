@@ -61,6 +61,14 @@ button {margin-top:5px;padding:4px 8px;cursor:pointer;}
         <option value="reverse">Reverse Mode</option>
         <option value="badfruit">Bad Fruit Mode</option>
     </select>
+
+    <div>Number of Fruits:</div>
+    <select id="fruitCount">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+    </select>
     
     <button id="closeMenu">Resume</button>
 </div>
@@ -70,10 +78,10 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const box = 20;
 
-// Ensure all variables are initialized
+// Variables
 let snake = [{x:9*box,y:9*box}];
 let direction="RIGHT";
-let food={x:Math.floor(Math.random()*20)*box, y:Math.floor(Math.random()*20)*box};
+let foods = [];
 let score=0;
 let gameOver=false;
 let pulse=0;
@@ -83,13 +91,16 @@ let fruitType="apple";
 let bgPreset="gradient1";
 let gameMode="normal";
 let walls = [];
-let badFruit = false;
+let fruitCount = 1; 
+let badFruitIndices = []; 
 
+// Menu elements
 const menu = document.getElementById("menu");
 const snakeColorInput = document.getElementById("snakeColor");
 const fruitSelect = document.getElementById("fruitType");
 const bgSelect = document.getElementById("bgPreset");
 const gameModeSelect = document.getElementById("gameMode");
+const fruitCountSelect = document.getElementById("fruitCount");
 const closeMenuBtn = document.getElementById("closeMenu");
 
 // Event listeners
@@ -105,26 +116,55 @@ document.addEventListener("keydown", e=>{
 snakeColorInput.addEventListener("input", e=>snakeColor=e.target.value);
 fruitSelect.addEventListener("change", e=>fruitType=e.target.value);
 bgSelect.addEventListener("change", e=>bgPreset=e.target.value);
-gameModeSelect.addEventListener("change", e=>gameMode=e.target.value);
+gameModeSelect.addEventListener("change", e=>{
+    gameMode=e.target.value;
+    if(gameMode==="badfruit" && fruitCount===1) fruitCount=2; 
+    spawnFruits();
+});
+fruitCountSelect.addEventListener("change", e=>{
+    fruitCount=parseInt(e.target.value);
+    if(gameMode==="badfruit" && fruitCount===1) fruitCount=2; 
+    spawnFruits();
+});
 closeMenuBtn.addEventListener("click", togglePause);
 
 function togglePause(){ paused=!paused; menu.style.display=paused?"block":"none"; }
 
-function spawnFood(){
-    let fx=Math.floor(Math.random()*20)*box;
-    let fy=Math.floor(Math.random()*20)*box;
-    badFruit = (gameMode==="badfruit" && Math.random()<0.2);
-    return {x:fx,y:fy};
+function spawnFruits(){
+    foods = [];
+    badFruitIndices = [];
+    let count = fruitCount;
+
+    if(gameMode==="badfruit" && count===1) count=2;
+
+    for(let i=0;i<count;i++){
+        let fx=Math.floor(Math.random()*20)*box;
+        let fy=Math.floor(Math.random()*20)*box;
+        foods.push({x:fx,y:fy});
+    }
+
+    if(gameMode==="badfruit"){
+        let badCount = 0;
+        if(count===2) badCount = 1;
+        else if(count===3) badCount = Math.floor(Math.random()*2)+1;
+        else if(count===4) badCount = Math.floor(Math.random()*3)+1;
+
+        while(badFruitIndices.length<badCount){
+            let idx = Math.floor(Math.random()*count);
+            if(!badFruitIndices.includes(idx)) badFruitIndices.push(idx);
+        }
+    }
 }
 
+// reset game
 function reset(){
     snake=[{x:9*box,y:9*box}];
     direction="RIGHT";
-    food=spawnFood();
     score=0;
     gameOver=false;
     pulse=0;
     walls=[];
+    spawnFruits();
 }
 
 // Background presets
@@ -192,27 +232,31 @@ function drawSnake(){
     });
 }
 
-// Draw fruit
-function drawFood(){
-    pulse+=0.1; let radius=box/2-2+Math.sin(pulse)*2;
-    let color1,color2,leafColor='green';
-    if(fruitType==='apple'){color1='#ff5555'; color2='#aa1111';}
-    else if(fruitType==='cherry'){color1='#ff007f'; color2='#aa0040';}
-    else if(fruitType==='orange'){color1='#ff8800'; color2='#cc5500';}
-    else if(fruitType==='lime'){color1='#88ff00'; color2='#55aa00';}
-    else if(fruitType==='blueberry'){color1='#5555ff'; color2='#1111aa'; leafColor='#228B22';}
+// Draw fruits
+function drawFruits(){
+    pulse+=0.1;
+    foods.forEach((food,i)=>{
+        let radius=box/2-2+Math.sin(pulse)*2;
+        let color1,color2,leafColor='green';
+        if(fruitType==='apple'){color1='#ff5555'; color2='#aa1111';}
+        else if(fruitType==='cherry'){color1='#ff007f'; color2='#aa0040';}
+        else if(fruitType==='orange'){color1='#ff8800'; color2='#cc5500';}
+        else if(fruitType==='lime'){color1='#88ff00'; color2='#55aa00'; leafColor='#228B22';}
+        else if(fruitType==='blueberry'){color1='#5555ff'; color2='#1111aa'; leafColor='#228B22';}
 
-    if(gameMode==="badfruit" && badFruit){ color1="#000000"; color2="#222222"; leafColor="#550000"; }
+        if(gameMode==="badfruit" && badFruitIndices.includes(i)){ color1="#000000"; color2="#222222"; leafColor="#550000"; }
 
-    const gradient=ctx.createRadialGradient(food.x+box/2,food.y+box/2,2,food.x+box/2,food.y+box/2,radius);
-    gradient.addColorStop(0,color1); gradient.addColorStop(1,color2);
-    ctx.fillStyle=gradient; ctx.beginPath(); ctx.arc(food.x+box/2,food.y+box/2,radius,0,Math.PI*2); ctx.fill();
+        const gradient=ctx.createRadialGradient(food.x+box/2,food.y+box/2,2,food.x+box/2,food.y+box/2,radius);
+        gradient.addColorStop(0,color1); gradient.addColorStop(1,color2);
+        ctx.fillStyle=gradient; ctx.beginPath(); ctx.arc(food.x+box/2,food.y+box/2,radius,0,Math.PI*2); ctx.fill();
 
-    ctx.fillStyle=leafColor; ctx.beginPath();
-    ctx.moveTo(food.x+box/2,food.y+box/2-radius);
-    ctx.lineTo(food.x+box/2+5,food.y+box/2-radius-8);
-    ctx.lineTo(food.x+box/2-5,food.y+box/2-radius-8);
-    ctx.closePath(); ctx.fill();
+        // leaf
+        ctx.fillStyle=leafColor; ctx.beginPath();
+        ctx.moveTo(food.x+box/2,food.y+box/2-radius);
+        ctx.lineTo(food.x+box/2+5,food.y+box/2-radius-8);
+        ctx.lineTo(food.x+box/2-5,food.y+box/2-radius-8);
+        ctx.closePath(); ctx.fill();
+    });
 }
 
 // Score
@@ -236,31 +280,60 @@ function update(){
 
     snake.unshift(head);
 
-    if(head.x===food.x&&head.y===food.y){
-        score++;
-        if(gameMode==="wall") walls.push({x:food.x,y:food.y});
-        if(gameMode==="reverse"){ if(direction==="UP") direction="DOWN";
-                                   else if(direction==="DOWN") direction="UP";
-                                   else if(direction==="LEFT") direction="RIGHT";
-                                   else direction="LEFT";}
-        if(gameMode==="badfruit" && badFruit) gameOver=true;
-        food=spawnFood();
-    } else snake.pop();
+    // check all fruits
+    for(let i=0;i<foods.length;i++){
+        if(head.x===foods[i].x && head.y===foods[i].y){
+            score++;
+            if(gameMode==="wall") walls.push({x:foods[i].x,y:foods[i].y});
+            if(gameMode==="reverse"){ if(direction==="UP") direction="DOWN";
+                                       else if(direction==="DOWN") direction="UP";
+                                       else if(direction==="LEFT") direction="RIGHT";
+                                       else direction="LEFT";}
+            if(gameMode==="badfruit" && badFruitIndices.includes(i)) gameOver=true;
+
+            // REPLACE ONLY THE EATEN FRUIT
+            let fx=Math.floor(Math.random()*20)*box;
+            let fy=Math.floor(Math.random()*20)*box;
+            foods[i] = {x: fx, y: fy };
+
+            if(gameMode==="badfruit"){
+                badFruitIndices[i] = Math.random()<0.5 ? true : false;
+            }
+
+            return;
+        }
+    }
+
+    if(gameMode!=="badfruit" || foods.length>0) snake.pop();
 }
 
 // Draw loop
 function draw(){
-    drawBackground(); drawGrid(); drawWalls(); drawFood(); drawSnake(); drawScore();
+    drawBackground(); 
+    drawGrid(); 
+    drawWalls(); 
+    drawFruits(); 
+    drawSnake(); 
+    drawScore();
     update();
-    if(gameOver){ ctx.fillStyle='red'; ctx.font='20px Arial'; ctx.fillText("GAME OVER",120,190);
-        ctx.font='14px Arial'; ctx.fillText("Press R to Restart",125,215);}
+    if(gameOver){ 
+        ctx.fillStyle='red'; 
+        ctx.font='20px Arial'; 
+        ctx.fillText("GAME OVER",120,190);
+        ctx.font='14px Arial'; 
+        ctx.fillText("Press R to Restart",125,215);
+    }
+
+    // Draw credit
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '12px Arial';
+    ctx.fillText('- made by ChatGPT', 10, canvas.height - 10);
 }
 
-// Safe interval
+// start game
+spawnFruits();
 setInterval(function(){ try{ draw(); } catch(e){ console.error("Draw error:",e); } },100);
 </script>
 
 </body>
 </html>
-
-- made by chatgpt
